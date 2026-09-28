@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3c4d5c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="מערכת לניהול מסופונים" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>התחברות – מערכת לניהול מסופונים</title>
+  <script>
+    // Already logged in? Go straight to the right side of the system.
+    try {
+      const s = JSON.parse(localStorage.getItem('tms.session.v1'));
+      if (s) location.replace(s.role === 'manager' ? 'admin.html' : 'dashboard.html');
+    } catch {}
+  </script>
+</head>
+<body class="login-page">
+  <div id="splash" class="splash" aria-hidden="true">
+    <img src="icon-novolog-logo.png" class="splash-icon" alt="" />
+  </div>
+  <script>
+    // Hide the splash once the page has loaded (with a short branded pause and a safety timeout)
+    (() => {
+      let hidden = false;
+      const hide = () => {
+        if (hidden) return;
+        hidden = true;
+        const s = document.getElementById('splash');
+        s.classList.add('fade');
+        setTimeout(() => s.remove(), 500);
+      };
+      window.addEventListener('load', () => setTimeout(hide, 900));
+      setTimeout(hide, 4000);
+    })();
+  </script>
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="14" rx="2"/>
+          <path d="M7 9 l3 2.5 L7 14"/>
+          <line x1="12" y1="14" x2="16" y2="14"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="18" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <h1 class="login-title">מערכת לניהול מסופונים</h1>
+      <form id="loginForm" novalidate>
+        <div class="role-picker" role="radiogroup" aria-label="סוג משתמש">
+          <button type="button" id="roleEmployee" class="role-option selected" aria-pressed="true">עובד</button>
+          <button type="button" id="roleManager" class="role-option" aria-pressed="false">מנהל</button>
+        </div>
+        <label id="empCodeField">
+          קוד עובד
+          <span class="password-field">
+            <input type="text" id="loginEmpCode" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="לדוגמה: 12345" />
+            <button type="button" id="scanEmpBtn" class="toggle-password" aria-label="סריקת ברקוד של קוד העובד" title="סריקת ברקוד של קוד העובד">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="2" y="5" width="2" height="14"/>
+                <rect x="5.5" y="5" width="1" height="14"/>
+                <rect x="8" y="5" width="2.5" height="14"/>
+                <rect x="12" y="5" width="1" height="14"/>
+                <rect x="14.5" y="5" width="2" height="14"/>
+                <rect x="18" y="5" width="1" height="14"/>
+                <rect x="20.5" y="5" width="1.5" height="14"/>
+              </svg>
+            </button>
+          </span>
+        </label>
+        <label id="usernameField" class="hidden">
+          שם משתמש
+          <span class="password-field">
+            <input type="text" id="loginUsername" autocomplete="username" maxlength="40" placeholder="הזן שם משתמש" />
+            <button type="button" id="scanLoginBtn" class="toggle-password" aria-label="סריקת שם משתמש וסיסמה" title="סריקת שם משתמש וסיסמה">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <rect x="2" y="5" width="2" height="14"/>
+                <rect x="5.5" y="5" width="1" height="14"/>
+                <rect x="8" y="5" width="2.5" height="14"/>
+                <rect x="12" y="5" width="1" height="14"/>
+                <rect x="14.5" y="5" width="2" height="14"/>
+                <rect x="18" y="5" width="1" height="14"/>
+                <rect x="20.5" y="5" width="1.5" height="14"/>
+              </svg>
+            </button>
+          </span>
+        </label>
+        <label>
+          סיסמה
+          <span class="password-field">
+            <input type="password" id="loginPassword" autocomplete="current-password" required maxlength="40" placeholder="הזן סיסמה" />
+            <button type="button" id="togglePassword" class="toggle-password" aria-label="הצג סיסמה">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </span>
+        </label>
+        <p id="loginError" class="login-error hidden">יש למלא את כל השדות</p>
+        <button type="submit" class="primary-btn login-btn">התחברות למערכת</button>
+      </form>
+      <div class="login-footer-brand">
+        <p>© 2026 כל הזכויות שמורות ל־<img src="novolog-logo.png" alt="Novolog" /></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credentials scan modal -->
+  <div id="loginScanModal" class="modal hidden">
+    <div class="modal-content scan-content">
+      <button type="button" class="modal-close" id="loginScanClose" aria-label="סגור">×</button>
+      <h2 id="loginScanTitle">סריקת פרטי התחברות</h2>
+      <div class="scan-viewfinder">
+        <video id="loginScanVideo" class="scan-video hidden" autoplay playsinline muted></video>
+        <span class="scan-corner tl"></span>
+        <span class="scan-corner tr"></span>
+        <span class="scan-corner bl"></span>
+        <span class="scan-corner br"></span>
+        <div id="loginScanFallback" class="scan-barcode" aria-hidden="true"></div>
+        <div class="scan-line"></div>
+      </div>
+      <p id="loginScanHint" class="scan-hint">סרוק את הברקוד או קוד ה-QR שעל תג המנהל</p>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+      const SESSION_KEY = 'tms.session.v1';
+
+      // Predefined manager accounts
+      const MANAGERS = [
+        { empCode: '123456', username: 'אלמוג', password: '1234567' },
+      ];
+      const loginForm = document.getElementById('loginForm');
+      const empCode = document.getElementById('loginEmpCode');
+      const username = document.getElementById('loginUsername');
+      const password = document.getElementById('loginPassword');
+      const loginError = document.getElementById('loginError');
+      const togglePassword = document.getElementById('togglePassword');
+      const roleEmployee = document.getElementById('roleEmployee');
+      const roleManager = document.getElementById('roleManager');
+      let role = 'employee';
+
+      const usernameField = document.getElementById('usernameField');
+      const empCodeField = document.getElementById('empCodeField');
+      const scanLoginBtn = document.getElementById('scanLoginBtn');
+
+      function selectRole(newRole) {
+        role = newRole;
+        roleEmployee.classList.toggle('selected', role === 'employee');
+        roleManager.classList.toggle('selected', role === 'manager');
+        roleEmployee.setAttribute('aria-pressed', role === 'employee');
+        roleManager.setAttribute('aria-pressed', role === 'manager');
+        // Employees: code + password. Managers: username + password (+ scan icon)
+        usernameField.classList.toggle('hidden', role === 'employee');
+        empCodeField.classList.toggle('hidden', role === 'manager');
+        loginError.classList.add('hidden');
+      }
+
+      roleEmployee.addEventListener('click', () => selectRole('employee'));
+      roleManager.addEventListener('click', () => selectRole('manager'));
+
+      togglePassword.addEventListener('click', () => {
+        const show = password.type === 'password';
+        password.type = show ? 'text' : 'password';
+        togglePassword.classList.toggle('showing', show);
+      });
+
+      loginForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const code = empCode.value.trim();
+        const user = username.value.trim();
+        const pass = password.value.trim();
+        if (!pass || (role === 'manager' ? !user : !code)) {
+          loginError.textContent = 'יש למלא את כל השדות';
+          loginError.classList.remove('hidden');
+          return;
+        }
+        let manager = null;
+        if (role === 'manager') {
+          manager = MANAGERS.find((m) => m.username === user && m.password === pass);
+          if (!manager) {
+            loginError.textContent = 'פרטי ההתחברות של המנהל שגויים';
+            loginError.classList.remove('hidden');
+            return;
+          }
+        }
+        let employeeName = '';
+        if (role === 'employee') {
+          // An employee marked inactive by a manager cannot log in;
+          // a known employee gets their name from the employees list
+          try {
+            const st = JSON.parse(localStorage.getItem('terminalManagementSystem.v1')) || {};
+            const emps = Array.isArray(st.employees) ? st.employees : [];
+            const emp = emps.find((x) => x.code === code);
+            if (emp && emp.active === false) {
+              loginError.textContent = 'העובד אינו פעיל במערכת – יש לפנות למנהל';
+              loginError.classList.remove('hidden');
+              return;
+            }
+            if (emp && emp.name) employeeName = emp.name;
+          } catch {}
+        }
+        loginError.classList.add('hidden');
+        try {
+          localStorage.setItem(SESSION_KEY, JSON.stringify({
+            empCode: role === 'manager' ? (manager ? manager.empCode : '') : code,
+            username: role === 'manager' ? user : employeeName,
+            role,
+            loginAt: new Date().toISOString(),
+          }));
+        } catch {}
+        location.replace(role === 'manager' ? 'admin.html' : 'dashboard.html');
+      });
+
+      // ---------- Barcode scanning (manager badge / employee code) ----------
+      const loginScanModal = document.getElementById('loginScanModal');
+      const loginScanVideo = document.getElementById('loginScanVideo');
+      const loginScanFallback = document.getElementById('loginScanFallback');
+      const loginScanHint = document.getElementById('loginScanHint');
+      const loginScanTitle = document.getElementById('loginScanTitle');
+      const loginScanClose = document.getElementById('loginScanClose');
+      const scanEmpBtn = document.getElementById('scanEmpBtn');
+      let scanStream = null;
+      let scanDetectTimer = null;
+      let scanSimTimer = null;
+      let scanMode = 'manager'; // 'manager' | 'employee'
+
+      const SCAN_TEXTS = {
+        manager: {
+          title: 'סריקת פרטי התחברות',
+          hint: 'סרוק את הברקוד או קוד ה-QR שעל תג המנהל',
+          sim: 'אלמוג|1234567',
+        },
+        employee: {
+          title: 'סריקת קוד עובד',
+          hint: 'סרוק את הברקוד שעל תג העובד',
+          sim: '12345',
+        },
+      };
+
+      function stopLoginScan() {
+        clearInterval(scanDetectTimer);
+        clearTimeout(scanSimTimer);
+        scanDetectTimer = null;
+        scanSimTimer = null;
+        if (scanStream) {
+          scanStream.getTracks().forEach((t) => t.stop());
+          scanStream = null;
+        }
+        loginScanVideo.srcObject = null;
+      }
+
+      function closeLoginScan() {
+        stopLoginScan();
+        loginScanModal.classList.add('hidden');
+      }
+
+      // Manager code content: "username|password" (also supports ; , : or a new line).
+      // Employee code content: the employee code itself.
+      function applyScannedCredentials(raw) {
+        const parts = String(raw).split(/[|;,:\n]/).map((p) => p.trim()).filter(Boolean);
+        if (!parts.length) return false;
+        if (scanMode === 'employee') {
+          empCode.value = parts[0];
+        } else {
+          username.value = parts[0];
+          if (parts[1]) password.value = parts[1];
+        }
+        closeLoginScan();
+        loginError.classList.add('hidden');
+        return true;
+      }
+
+      async function openLoginScan(mode) {
+        scanMode = mode;
+        loginScanTitle.textContent = SCAN_TEXTS[scanMode].title;
+        loginScanModal.classList.remove('hidden');
+        stopLoginScan();
+
+        let cameraOn = false;
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          try {
+            scanStream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: 'environment' },
+              audio: false,
+            });
+            loginScanVideo.srcObject = scanStream;
+            cameraOn = true;
+          } catch {}
+        }
+        loginScanVideo.classList.toggle('hidden', !cameraOn);
+        loginScanFallback.classList.toggle('hidden', cameraOn);
+
+        if (cameraOn && 'BarcodeDetector' in window) {
+          loginScanHint.textContent = SCAN_TEXTS[scanMode].hint;
+          const detector = new BarcodeDetector();
+          scanDetectTimer = setInterval(async () => {
+            if (!scanStream || loginScanVideo.readyState < 2) return;
+            try {
+              const codes = await detector.detect(loginScanVideo);
+              if (codes.length && codes[0].rawValue) applyScannedCredentials(codes[0].rawValue);
+            } catch {}
+          }, 350);
+        } else if (cameraOn) {
+          // Camera works but no barcode decoding in this browser – simulate (demo)
+          loginScanHint.textContent = SCAN_TEXTS[scanMode].hint;
+          scanSimTimer = setTimeout(() => applyScannedCredentials(SCAN_TEXTS[scanMode].sim), 2600);
+        } else {
+          loginScanHint.textContent = 'לא נמצאה מצלמה – מדמה סריקה...';
+          scanSimTimer = setTimeout(() => applyScannedCredentials(SCAN_TEXTS[scanMode].sim), 2200);
+        }
+      }
+
+      scanLoginBtn.addEventListener('click', () => openLoginScan('manager'));
+      scanEmpBtn.addEventListener('click', () => openLoginScan('employee'));
+      loginScanClose.addEventListener('click', closeLoginScan);
+      loginScanModal.addEventListener('click', (e) => {
+        if (e.target === loginScanModal) closeLoginScan();
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>מערכת לניהול מסופונים</title>
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <script>
+    // Entry point: employees go to the dashboard, managers to the admin side, everyone else to login.
+    try {
+      const s = JSON.parse(localStorage.getItem('tms.session.v1'));
+      location.replace(s ? (s.role === 'manager' ? 'admin.html' : 'dashboard.html') : 'login.html');
+    } catch {
+      location.replace('login.html');
+    }
+  </script>
+  <meta http-equiv="refresh" content="0; url=login.html" />
+</head>
+<body></body>
+</html>

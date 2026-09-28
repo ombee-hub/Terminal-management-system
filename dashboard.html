@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3c4d5c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="מערכת לניהול מסופונים" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>מערכת לניהול מסופונים</title>
+  <script>
+    // Employee side: not logged in → login; manager → admin side.
+    try {
+      const s = JSON.parse(localStorage.getItem('tms.session.v1'));
+      if (!s) location.replace('login.html');
+      else if (s.role === 'manager') location.replace('admin.html');
+    } catch {
+      location.replace('login.html');
+    }
+  </script>
+</head>
+<body>
+  <div id="splash" class="splash" aria-hidden="true">
+    <img src="icon-novolog-logo.png" class="splash-icon" alt="" />
+  </div>
+  <script>
+    // Hide the splash once the page has loaded (with a short branded pause and a safety timeout)
+    (() => {
+      let hidden = false;
+      const hide = () => {
+        if (hidden) return;
+        hidden = true;
+        const s = document.getElementById('splash');
+        s.classList.add('fade');
+        setTimeout(() => s.remove(), 500);
+      };
+      window.addEventListener('load', () => setTimeout(hide, 900));
+      setTimeout(hide, 4000);
+    })();
+  </script>
+  <header>
+    <img src="novolog-logo-white.png" alt="Novolog" class="header-logo" />
+    <h1>מערכת לניהול מסופונים</h1>
+    <button type="button" id="headerLogoutBtn" class="header-logout" aria-label="התנתקות">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      <span>התנתקות</span>
+    </button>
+  </header>
+
+  <main>
+    <section id="tab-meds" class="tab-panel active">
+      <button id="addBtn" class="primary-btn scan-cta">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <rect x="2" y="5" width="2" height="14"/>
+          <rect x="5.5" y="5" width="1" height="14"/>
+          <rect x="8" y="5" width="2.5" height="14"/>
+          <rect x="12" y="5" width="1" height="14"/>
+          <rect x="14.5" y="5" width="2" height="14"/>
+          <rect x="18" y="5" width="1" height="14"/>
+          <rect x="20.5" y="5" width="1.5" height="14"/>
+        </svg>
+        לקיחת מסופון
+      </button>
+      <ul id="medsList" class="meds-list"></ul>
+      <p id="emptyMeds" class="empty hidden">אין מסופונים ברשותך. לחץ על "לקיחת מסופון" כדי לסרוק מסופון חדש.</p>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <ul id="historyList" class="history-list"></ul>
+      <p id="emptyHistory" class="empty hidden">עדיין לא נרשמה היסטוריה.</p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="תפריט ראשי">
+    <button class="nav-item tab" data-tab="history" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span class="nav-label">היסטוריה</span>
+    </button>
+    <button class="nav-item tab center-action active" data-tab="meds" type="button">
+      <span class="nav-icon-circle">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="2.5" width="12" height="19" rx="2"/>
+          <line x1="9" y1="6.5" x2="15" y2="6.5"/>
+          <rect x="9" y="10" width="2" height="2"/>
+          <rect x="13" y="10" width="2" height="2"/>
+          <rect x="9" y="14" width="2" height="2"/>
+          <rect x="13" y="14" width="2" height="2"/>
+        </svg>
+      </span>
+      <span class="nav-label">מסופונים</span>
+    </button>
+    <button class="nav-item" id="navSettings" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2 v3 M12 19 v3 M2 12 h3 M19 12 h3 M5 5 l 2.1 2.1 M16.9 16.9 l 2.1 2.1 M16.9 7.1 l 2.1 -2.1 M5 19 l 2.1 -2.1"/>
+      </svg>
+      <span class="nav-label">הגדרות</span>
+    </button>
+  </nav>
+
+  <!-- Add/Edit medication modal -->
+  <div id="medModal" class="modal hidden">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close="medModal" aria-label="סגור">×</button>
+      <h2 id="modalTitle">הוסף כדור</h2>
+      <form id="medForm">
+        <label>
+          שם הכדור
+          <input type="text" id="medName" required maxlength="60" />
+        </label>
+
+        <label>צורת הכדור</label>
+        <div id="shapePicker" class="shape-picker" role="radiogroup"></div>
+
+        <label>צבע</label>
+        <div id="colorPicker" class="color-picker" role="radiogroup"></div>
+
+        <label>
+          ימים בשבוע
+          <span class="hint">בחר ימים שבהם לקחת את הכדור</span>
+        </label>
+        <div id="daysPicker" class="days-picker" role="group"></div>
+
+        <label>
+          שעות לקיחה
+          <span class="hint">לחץ על + כדי להוסיף שעה</span>
+        </label>
+        <div id="timesContainer" class="times-container"></div>
+        <button type="button" id="addTimeBtn" class="secondary-btn">+ הוסף שעה</button>
+
+        <div class="modal-actions">
+          <button type="button" id="cancelBtn" class="ghost-btn">ביטול</button>
+          <button type="submit" id="saveBtn" class="primary-btn" disabled>שמור</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Terminal scan modal -->
+  <div id="scanModal" class="modal hidden">
+    <div class="modal-content scan-content">
+      <button type="button" class="modal-close" data-close="scanModal" aria-label="סגור">×</button>
+      <h2 id="scanTitle">לקיחת מסופון</h2>
+
+      <!-- Scanning view -->
+      <div id="scanView">
+        <div class="scan-viewfinder">
+          <video id="scanVideo" class="scan-video hidden" autoplay playsinline muted></video>
+          <span class="scan-corner tl"></span>
+          <span class="scan-corner tr"></span>
+          <span class="scan-corner bl"></span>
+          <span class="scan-corner br"></span>
+          <div id="scanFallback" class="scan-barcode" aria-hidden="true"></div>
+          <div class="scan-line"></div>
+        </div>
+        <p id="scanHint" class="scan-hint">כוון את המצלמה אל הברקוד שעל גב המסופון</p>
+      </div>
+
+      <!-- Scan result view -->
+      <div id="scanResult" class="hidden">
+        <div class="scan-success-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="8 12.5 11 15.5 16 9"/>
+          </svg>
+        </div>
+        <p class="scan-success-title">המסופון זוהה בהצלחה</p>
+        <div class="scan-details">
+          <div class="scan-detail-row"><span>מספר סידורי</span><strong id="scanSerial"></strong></div>
+          <div class="scan-detail-row"><span>דגם</span><strong id="scanModel"></strong></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" id="scanAgainBtn" class="ghost-btn">סריקה חוזרת</button>
+          <button type="button" id="continueSignBtn" class="primary-btn">המשך לחתימה</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Terminal signature screen -->
+  <div id="signScreen" class="sign-screen hidden">
+    <header class="sign-header">
+      <button type="button" class="modal-close sign-close" data-close="signScreen" aria-label="ביטול">×</button>
+      <h2 id="signTitle">חתימה על לקיחת מסופון</h2>
+    </header>
+    <div class="sign-body">
+      <div class="scan-details sign-details">
+        <div class="scan-detail-row"><span>מספר סידורי</span><strong id="signSerial"></strong></div>
+        <div class="scan-detail-row"><span>דגם</span><strong id="signModel"></strong></div>
+      </div>
+      <p id="signInstruction" class="sign-instruction">אני מאשר/ת בחתימתי כי קיבלתי את המסופון לידיי ואני אחראי/ת עליו עד להחזרתו.</p>
+      <div class="signature-pad-wrap sign-pad-area">
+        <canvas id="signaturePad"></canvas>
+        <button type="button" id="clearSignatureBtn" class="signature-clear">נקה</button>
+      </div>
+      <div class="sign-actions">
+        <button type="button" id="signBackBtn" class="ghost-btn">חזרה</button>
+        <button type="button" id="scanConfirmBtn" class="primary-btn" disabled>אישור לקיחה</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm dialog -->
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-content small">
+      <button type="button" class="modal-close" data-close="confirmModal" aria-label="סגור">×</button>
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button type="button" id="confirmCancel" class="ghost-btn">ביטול</button>
+        <button type="button" id="confirmOk" class="danger-btn">מחק</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close="settingsModal" aria-label="סגור">×</button>
+      <h2>הגדרות תזכורות</h2>
+
+      <label class="toggle-row">
+        <span>הפעל תזכורות וצלילים</span>
+        <input type="checkbox" id="remindersToggle" />
+      </label>
+
+      <p id="permissionStatus" class="hint"></p>
+
+      <button type="button" id="testSoundBtn" class="secondary-btn">השמע צליל לדוגמה</button>
+
+      <details class="info-box">
+        <summary>איך זה עובד?</summary>
+        <ul class="info-list">
+          <li>תזכורות וצלילים פועלים כשהאפליקציה פתוחה בדפדפן או הותקנה למסך הבית.</li>
+          <li>בגלקסי: התראות עובדות גם כשהדפדפן ברקע.</li>
+          <li>באייפון: יש להוסיף "למסך הבית" כדי לקבל התראות (דרוש iOS 16.4 ומעלה).</li>
+          <li>תזכורות גם כשהטלפון נעול לחלוטין דורשות אפליקציה רגילה מחנות האפליקציות.</li>
+        </ul>
+      </details>
+
+      <div class="install-section">
+        <h3>התקנה למסך הבית</h3>
+        <div id="installContent"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="logoutBtn" class="ghost-btn">התנתק</button>
+        <button type="button" id="settingsClose" class="primary-btn">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reminder alert modal -->
+  <div id="reminderModal" class="modal hidden reminder-modal">
+    <div class="modal-content">
+      <button type="button" class="modal-close" data-close="reminderModal" aria-label="סגור">×</button>
+      <div class="reminder-icon">⏰</div>
+      <h2>הגיע הזמן לקחת:</h2>
+      <div id="reminderPillIcon" class="reminder-pill-icon"></div>
+      <p id="reminderMedName" class="reminder-med-name"></p>
+      <p id="reminderTime" class="reminder-time"></p>
+      <div class="modal-actions reminder-actions">
+        <button type="button" id="reminderTook" class="primary-btn">לקחתי</button>
+        <button type="button" id="reminderSnooze" class="secondary-btn">דחה ב-10 דקות</button>
+        <button type="button" id="reminderDismiss" class="ghost-btn">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time picker modal (smartphone-style wheels) -->
+  <div id="timePickerModal" class="modal hidden">
+    <div class="modal-content time-picker-content">
+      <button type="button" class="modal-close" data-close="timePickerModal" aria-label="סגור">×</button>
+      <h2>בחר שעה</h2>
+      <div class="time-picker">
+        <div class="wheel-highlight" aria-hidden="true"></div>
+        <div class="wheel" id="hourWheel" role="listbox" aria-label="שעה"></div>
+        <div class="wheel-separator">:</div>
+        <div class="wheel" id="minuteWheel" role="listbox" aria-label="דקה"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="timePickerCancel" class="ghost-btn">ביטול</button>
+        <button type="button" id="timePickerOk" class="primary-btn">אישור</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Logout: clear the session and return to the login page.
+    function tmsLogout() {
+      try { localStorage.removeItem('tms.session.v1'); } catch {}
+      location.replace('login.html');
+    }
+    document.getElementById('logoutBtn').addEventListener('click', tmsLogout);
+    document.getElementById('headerLogoutBtn').addEventListener('click', tmsLogout);
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

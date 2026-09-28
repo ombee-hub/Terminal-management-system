@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#3c4d5c" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="מערכת לניהול מסופונים" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>ניהול – מערכת לניהול מסופונים</title>
+  <script>
+    // Manager side: not logged in → login; employee → employee dashboard.
+    try {
+      const s = JSON.parse(localStorage.getItem('tms.session.v1'));
+      if (!s) location.replace('login.html');
+      else if (s.role !== 'manager') location.replace('dashboard.html');
+    } catch {
+      location.replace('login.html');
+    }
+  </script>
+</head>
+<body>
+  <div id="splash" class="splash" aria-hidden="true">
+    <img src="icon-novolog-logo.png" class="splash-icon" alt="" />
+  </div>
+  <script>
+    // Hide the splash once the page has loaded (with a short branded pause and a safety timeout)
+    (() => {
+      let hidden = false;
+      const hide = () => {
+        if (hidden) return;
+        hidden = true;
+        const s = document.getElementById('splash');
+        s.classList.add('fade');
+        setTimeout(() => s.remove(), 500);
+      };
+      window.addEventListener('load', () => setTimeout(hide, 900));
+      setTimeout(hide, 4000);
+    })();
+  </script>
+  <header>
+    <img src="novolog-logo-white.png" alt="Novolog" class="header-logo" />
+    <h1>מערכת לניהול מסופונים <span class="role-badge">מנהלים</span></h1>
+    <p id="headerUser" class="header-user"></p>
+    <button type="button" id="headerLogoutBtn" class="header-logout" aria-label="התנתקות">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      <span>התנתקות</span>
+    </button>
+  </header>
+
+  <main>
+    <section id="tab-terminals" class="tab-panel active">
+      <div class="stats-row">
+        <div class="stat-card">
+          <strong id="statOut">0</strong>
+          <span>מסופונים בשטח</span>
+        </div>
+        <div class="stat-card">
+          <strong id="statToday">0</strong>
+          <span>פעולות היום</span>
+        </div>
+        <div class="stat-card">
+          <strong id="statInventory">0</strong>
+          <span>סה"כ במלאי</span>
+        </div>
+      </div>
+      <ul id="terminalsList" class="meds-list"></ul>
+      <p id="emptyTerminals" class="empty hidden">אין מסופונים בשטח כרגע. כשעובד ייקח מסופון הוא יופיע כאן.</p>
+    </section>
+
+    <section id="tab-history" class="tab-panel">
+      <ul id="historyList" class="history-list"></ul>
+      <p id="emptyHistory" class="empty hidden">עדיין לא נרשמה היסטוריה.</p>
+    </section>
+
+    <section id="tab-inventory" class="tab-panel">
+      <button id="importBtn" class="primary-btn scan-cta" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9 15 12 18 15 15"/>
+        </svg>
+        ייבוא מסופונים מאקסל
+      </button>
+      <input type="file" id="importFileInput" accept=".xlsx,.xls,.csv,.txt" class="hidden" />
+      <p class="hint import-hint">קובץ Excel (xlsx) או CSV — עמודה ראשונה: מספר סידורי, עמודה שנייה: דגם.</p>
+      <p id="importStatus" class="import-status hidden"></p>
+      <ul id="inventoryList" class="history-list"></ul>
+      <p id="emptyInventory" class="empty hidden">המלאי ריק. ייבא רשימת מסופונים מקובץ אקסל כדי להתחיל.</p>
+    </section>
+
+    <section id="tab-reports" class="tab-panel">
+      <div class="report-filters" role="radiogroup" aria-label="טווח זמן">
+        <button type="button" class="report-range selected" data-days="1">היום</button>
+        <button type="button" class="report-range" data-days="7">7 ימים</button>
+        <button type="button" class="report-range" data-days="30">30 ימים</button>
+        <button type="button" class="report-range" data-days="0">הכל</button>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card">
+          <strong id="repTaken">0</strong>
+          <span>לקיחות</span>
+        </div>
+        <div class="stat-card">
+          <strong id="repReturned">0</strong>
+          <span>החזרות</span>
+        </div>
+        <div class="stat-card">
+          <strong id="repActiveEmp">0</strong>
+          <span>עובדים פעילים</span>
+        </div>
+      </div>
+
+      <div class="report-emp-header">
+        <h3 class="report-title">פעילות לפי עובד</h3>
+        <div id="repViewToggle" class="report-view-toggle hidden" role="radiogroup" aria-label="אופן תצוגה">
+          <button type="button" class="report-view-btn" data-view="chart">גרף</button>
+          <button type="button" class="report-view-btn" data-view="list">רשימה</button>
+        </div>
+      </div>
+      <div id="repEmpChart" class="emp-chart hidden"></div>
+      <ul id="repByEmployee" class="report-list"></ul>
+      <p id="repByEmployeeEmpty" class="empty hidden">אין פעילות בתקופה שנבחרה.</p>
+
+      <h3 class="report-title">פירוט לקיחות והחזרות</h3>
+      <div class="table-wrap rep-table-wrap">
+        <table class="data-table" id="repHistoryTable">
+          <thead>
+            <tr>
+              <th>תאריך ושעה</th>
+              <th>פעולה</th>
+              <th>מסופון</th>
+              <th>שם עובד</th>
+              <th>מחלקה</th>
+            </tr>
+          </thead>
+          <tbody id="repHistoryTbody"></tbody>
+        </table>
+      </div>
+      <p id="repHistoryEmpty" class="empty hidden">אין פעולות בתקופה שנבחרה.</p>
+
+      <h3 class="report-title">מסופונים בשטח מעל 3 ימים</h3>
+      <ul id="repOverdue" class="report-list"></ul>
+      <p id="repOverdueEmpty" class="empty hidden">אין מסופונים החורגים מ-3 ימים בשטח.</p>
+
+      <button type="button" id="exportCsvBtn" class="secondary-btn">ייצוא דו״ח מסופונים לאקסל</button>
+    </section>
+
+    <section id="tab-employees" class="tab-panel">
+      <button id="importEmpBtn" class="primary-btn scan-cta" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9 15 12 18 15 15"/>
+        </svg>
+        ייבוא עובדים מאקסל
+      </button>
+      <input type="file" id="importEmpFileInput" accept=".xlsx,.xls,.csv,.txt" class="hidden" />
+      <p class="hint import-hint">קובץ Excel (xlsx) או CSV — עמודה ראשונה: שם העובד, עמודה שנייה: קוד עובד, עמודה שלישית: מחלקה.</p>
+
+      <form id="addEmployeeForm" class="emp-add-form">
+        <input type="text" id="newEmpName" placeholder="שם העובד" maxlength="40" />
+        <input type="text" id="newEmpCode" placeholder="קוד עובד" inputmode="numeric" maxlength="20" />
+        <input type="text" id="newEmpDept" placeholder="מחלקה" maxlength="40" />
+        <button type="submit" class="primary-btn emp-add-btn">הוסף</button>
+      </form>
+      <p id="empStatus" class="import-status hidden"></p>
+
+      <div class="table-wrap">
+        <table class="data-table" id="employeesTable">
+          <thead>
+            <tr>
+              <th>שם העובד</th>
+              <th>קוד עובד</th>
+              <th>מחלקה</th>
+              <th>מסופונים</th>
+              <th>סטטוס</th>
+              <th aria-label="פעולות"></th>
+            </tr>
+          </thead>
+          <tbody id="employeesTbody"></tbody>
+        </table>
+      </div>
+      <p id="emptyEmployees" class="empty hidden">אין עובדים ברשימה. ייבא קובץ אקסל, הוסף עובד ידנית, או שעובדים יתווספו אוטומטית עם הפעילות הראשונה שלהם.</p>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="תפריט ראשי">
+    <button class="nav-item tab" data-tab="history" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span class="nav-label">היסטוריה</span>
+    </button>
+    <button class="nav-item tab center-action active" data-tab="terminals" type="button">
+      <span class="nav-icon-circle">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="6" y="2.5" width="12" height="19" rx="2"/>
+          <line x1="9" y1="6.5" x2="15" y2="6.5"/>
+          <rect x="9" y="10" width="2" height="2"/>
+          <rect x="13" y="10" width="2" height="2"/>
+          <rect x="9" y="14" width="2" height="2"/>
+          <rect x="13" y="14" width="2" height="2"/>
+        </svg>
+      </span>
+      <span class="nav-label">מסופונים</span>
+    </button>
+    <button class="nav-item tab" data-tab="inventory" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 8 12 3 3 8v13h18z"/>
+        <path d="M3 8h18"/>
+        <path d="M9 21v-8h6v8"/>
+      </svg>
+      <span class="nav-label">מלאי</span>
+    </button>
+    <button class="nav-item tab" data-tab="reports" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="4" y1="21" x2="4" y2="12"/>
+        <line x1="10" y1="21" x2="10" y2="6"/>
+        <line x1="16" y1="21" x2="16" y2="14"/>
+        <line x1="22" y1="21" x2="22" y2="9"/>
+      </svg>
+      <span class="nav-label">דוחות</span>
+    </button>
+    <button class="nav-item tab" data-tab="employees" type="button">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      <span class="nav-label">עובדים</span>
+    </button>
+  </nav>
+
+  <!-- Signature viewer modal -->
+  <div id="signatureModal" class="modal hidden">
+    <div class="modal-content small">
+      <button type="button" class="modal-close" data-close="signatureModal" aria-label="סגור">×</button>
+      <h2 id="sigViewTitle">חתימה</h2>
+      <p id="sigViewMeta" class="hint"></p>
+      <div class="sig-view-frame">
+        <img id="sigViewImage" alt="חתימת העובד" />
+        <p id="sigViewEmpty" class="empty hidden">לא נשמרה חתימה לפעולה זו.</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="sigViewClose" class="primary-btn">סגור</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm dialog -->
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-content small">
+      <button type="button" class="modal-close" data-close="confirmModal" aria-label="סגור">×</button>
+      <p id="confirmText"></p>
+      <div class="modal-actions">
+        <button type="button" id="confirmCancel" class="ghost-btn">ביטול</button>
+        <button type="button" id="confirmOk" class="danger-btn">מחק</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
