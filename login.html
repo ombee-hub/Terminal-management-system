@@ -54,14 +54,14 @@
       <h1 class="login-title">מערכת לניהול מסופונים</h1>
       <form id="loginForm" novalidate>
         <div class="role-picker" role="radiogroup" aria-label="סוג משתמש">
-          <button type="button" id="roleEmployee" class="role-option selected" aria-pressed="true">עובד</button>
+          <button type="button" id="roleEmployee" class="role-option selected" aria-pressed="true">מחלקה</button>
           <button type="button" id="roleManager" class="role-option" aria-pressed="false">מנהל</button>
         </div>
         <label id="empCodeField">
-          קוד עובד
+          קוד מחלקה
           <span class="password-field">
             <input type="text" id="loginEmpCode" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="לדוגמה: 12345" />
-            <button type="button" id="scanEmpBtn" class="toggle-password" aria-label="סריקת ברקוד של קוד העובד" title="סריקת ברקוד של קוד העובד">
+            <button type="button" id="scanEmpBtn" class="toggle-password" aria-label="סריקת ברקוד של קוד המחלקה" title="סריקת ברקוד של קוד המחלקה">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <rect x="2" y="5" width="2" height="14"/>
                 <rect x="5.5" y="5" width="1" height="14"/>
@@ -202,7 +202,7 @@
             const emps = Array.isArray(st.employees) ? st.employees : [];
             const emp = emps.find((x) => x.code === code);
             if (emp && emp.active === false) {
-              loginError.textContent = 'העובד אינו פעיל במערכת – יש לפנות למנהל';
+              loginError.textContent = 'המחלקה אינה פעילה במערכת – יש לפנות למנהל';
               loginError.classList.remove('hidden');
               return;
             }
@@ -241,8 +241,8 @@
           sim: 'אלמוג|1234567',
         },
         employee: {
-          title: 'סריקת קוד עובד',
-          hint: 'סרוק את הברקוד שעל תג העובד',
+          title: 'סריקת קוד מחלקה',
+          hint: 'סרוק את הברקוד של המחלקה',
           sim: '12345',
         },
       };

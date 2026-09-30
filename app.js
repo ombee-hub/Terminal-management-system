@@ -52,7 +52,7 @@
   let selectedDays = [...ALL_DAYS];
 
   function loadState() {
-    let parsed = { meds: [], history: [], inventory: [], employees: [], settings: {}, triggered: {}, snoozes: [] };
+    let parsed = { meds: [], history: [], inventory: [], employees: [], removedEmployees: [], settings: {}, triggered: {}, snoozes: [] };
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -61,6 +61,7 @@
         parsed.history = Array.isArray(data.history) ? data.history : [];
         parsed.inventory = Array.isArray(data.inventory) ? data.inventory : [];
         parsed.employees = Array.isArray(data.employees) ? data.employees : [];
+        parsed.removedEmployees = Array.isArray(data.removedEmployees) ? data.removedEmployees : [];
         parsed.settings = data.settings && typeof data.settings === 'object' ? data.settings : {};
         parsed.triggered = data.triggered && typeof data.triggered === 'object' ? data.triggered : {};
         parsed.snoozes = Array.isArray(data.snoozes) ? data.snoozes : [];
@@ -101,7 +102,6 @@
   const historyList = $('#historyList');
   const emptyMeds = $('#emptyMeds');
   const emptyHistory = $('#emptyHistory');
-  const addBtn = $('#addBtn');
   const medModal = $('#medModal');
   const medForm = $('#medForm');
   const medNameInput = $('#medName');
@@ -278,6 +278,7 @@
 
   function renderMeds() {
     medsList.innerHTML = '';
+    // The issuing station sees every terminal that is out in the field
     if (state.meds.length === 0) {
       emptyMeds.classList.remove('hidden');
       return;
@@ -307,10 +308,21 @@
 
       const sub = document.createElement('span');
       sub.className = 'terminal-sub';
-      const takenAt = med.createdAt || Date.now();
-      sub.textContent = `${med.model || 'מסופון'} · נלקח ${formatDateTime(takenAt)}`;
+      const takenAt = med.transferredAt || med.createdAt || Date.now();
+      const lastAction = med.transferredAt ? 'הועבר' : 'נלקח';
+      sub.textContent = `${med.model || 'מסופון'} · ${lastAction} ${formatDateTime(takenAt)}`;
 
       info.append(name, sub);
+      const dept = document.createElement('span');
+      dept.className = 'terminal-sub terminal-emp';
+      dept.textContent = departmentLabel(med.employee);
+      info.append(dept);
+      if (med.receiver && med.receiver.name) {
+        const recv = document.createElement('span');
+        recv.className = 'terminal-sub';
+        recv.textContent = `מקבל: ${med.receiver.name}${med.receiver.empNo ? ` (עובד ${med.receiver.empNo})` : ''}`;
+        info.append(recv);
+      }
       headerLeft.append(icon, info);
 
       const status = document.createElement('span');
@@ -325,7 +337,7 @@
       const returnBtn = document.createElement('button');
       returnBtn.className = 'took-btn';
       returnBtn.textContent = 'החזרת מסופון';
-      returnBtn.addEventListener('click', () => openScanModal('return', med));
+      returnBtn.addEventListener('click', () => openIssueScreen('return', med));
 
       actions.append(returnBtn);
 
@@ -362,11 +374,31 @@
       name.className = 'history-name';
       name.textContent = entry.action ? `${entry.name} · ${entry.action}` : entry.name;
 
+      info.append(name);
+      if (entry.action !== 'הועבר' && entry.employee) {
+        const dept = document.createElement('span');
+        dept.className = 'history-time';
+        dept.textContent = `מחלקה: ${departmentLabel(entry.employee)}`;
+        info.append(dept);
+      }
+      if (entry.receiver && entry.receiver.name) {
+        const recv = document.createElement('span');
+        recv.className = 'history-time';
+        recv.textContent = `מקבל: ${entry.receiver.name}${entry.receiver.empNo ? ` (עובד ${entry.receiver.empNo})` : ''}`;
+        info.append(recv);
+      }
+      if (entry.action === 'הועבר' && entry.fromEmployee) {
+        const from = document.createElement('span');
+        from.className = 'history-time';
+        from.textContent = `ממחלקת ${departmentLabel(entry.fromEmployee)} אל ${departmentLabel(entry.employee)}`;
+        info.append(from);
+      }
+
       const time = document.createElement('span');
       time.className = 'history-time';
       time.textContent = formatDateTime(entry.takenAt);
 
-      info.append(name, time);
+      info.append(time);
       left.append(icon, info);
 
       const del = document.createElement('button');
@@ -443,25 +475,10 @@
     timesContainer.append(row);
   }
 
-  // ---------- Terminal scan ----------
-  const scanModal = $('#scanModal');
-  const scanView = $('#scanView');
-  const scanResult = $('#scanResult');
-  const scanSerial = $('#scanSerial');
-  const scanModel = $('#scanModel');
+  // ---------- Issue flow state ----------
   const scanConfirmBtn = $('#scanConfirmBtn');
-  const scanAgainBtn = $('#scanAgainBtn');
-  const scanVideo = $('#scanVideo');
-  const scanFallback = $('#scanFallback');
-  const scanHint = $('#scanHint');
-  const TERMINAL_MODELS = ['PAX A920', 'PAX A80', 'Verifone V240m', 'Ingenico Move/2500'];
-  let scanTimer = null;
-  let detectTimer = null;
-  let scanStream = null;
-  let scannedTerminal = null;
-  let scanMode = 'take'; // 'take' | 'return'
-  let returningMed = null;
-  const scanTitle = $('#scanTitle');
+  let scanMode = 'take'; // 'take' | 'return' | 'transfer'
+  let issueMed = null; // the med being returned
 
   function buildTrashIconSVG() {
     return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -486,95 +503,220 @@
     </svg>`;
   }
 
-  function generateSerial() {
-    let digits = '';
-    for (let i = 0; i < 6; i++) digits += Math.floor(Math.random() * 10);
-    return 'NVL-' + digits;
+  // Model from the warehouse inventory when the serial is registered there
+  function modelFromInventory(serial) {
+    const item = state.inventory.find((t) => t.serial === serial);
+    return item ? (item.model || 'מסופון') : null;
   }
 
-  function stopScanning() {
-    clearTimeout(scanTimer);
-    clearInterval(detectTimer);
-    scanTimer = null;
-    detectTimer = null;
-    if (scanStream) {
-      scanStream.getTracks().forEach((t) => t.stop());
-      scanStream = null;
-    }
-    scanVideo.srcObject = null;
-  }
-
-  function scanFound(serial) {
-    if (scanMode === 'return' && returningMed) {
-      // A real barcode that doesn't match the selected terminal – keep scanning
-      if (serial && serial !== returningMed.name) {
-        scanHint.textContent = 'הברקוד שנסרק אינו תואם למסופון שנבחר להחזרה – נסה שוב';
-        return;
-      }
-      scannedTerminal = {
-        serial: returningMed.name,
-        model: returningMed.model || 'מסופון',
-      };
-    } else {
-      scannedTerminal = {
-        serial: serial || generateSerial(),
-        model: TERMINAL_MODELS[Math.floor(Math.random() * TERMINAL_MODELS.length)],
-      };
-    }
-    stopScanning();
-    scanSerial.textContent = scannedTerminal.serial;
-    scanModel.textContent = scannedTerminal.model;
-    scanView.classList.add('hidden');
-    scanResult.classList.remove('hidden');
-    playReminderSound();
-  }
-
-  // ---------- Signature screen ----------
+  // ---------- Issue screen: one screen, like the whiteboard ----------
+  // Date-time + issuer automatic, RF scan or typing, receiver details,
+  // signature, and a single release button.
   const signScreen = $('#signScreen');
-  const signSerial = $('#signSerial');
   const signModel = $('#signModel');
-  const continueSignBtn = $('#continueSignBtn');
   const signBackBtn = $('#signBackBtn');
-
   const signTitle = $('#signTitle');
   const signInstruction = $('#signInstruction');
+  const signDateTime = $('#signDateTime');
+  const signIssuer = $('#signIssuer');
+  const signFromDeptRow = $('#signFromDeptRow');
+  const signFromDept = $('#signFromDept');
+  const signToDeptRow = $('#signToDeptRow');
+  const issueSerial = $('#issueSerial');
+  const issueError = $('#issueError');
+  // The issuing station is always the returns department, whoever is logged in
+  const ISSUING_STATION = 'מחלקת החזרות';
 
-  function openSignScreen() {
-    if (!scannedTerminal) return;
+  const receiverFields = $('#receiverFields');
+  const recvDept = $('#recvDept');
+  const recvName = $('#recvName');
+  const recvEmpNo = $('#recvEmpNo');
+  let issueClockTimer = null;
+  let deptOptions = []; // active departments, managed by the admin side
+
+  // The departments offered in the "receiving department" list by default
+  const DEFAULT_DEPARTMENTS = ['מחלקת החזרות', 'מחלקת מלאי', 'מחלקת קבלה', 'מחלקת ליקוט'];
+  // Person accounts that must never appear as departments (cleaned up + blocked)
+  const BLOCKED_DEPARTMENTS = ['עמרי'];
+
+  function ensureDefaultDepartments() {
+    let changed = false;
+    BLOCKED_DEPARTMENTS.forEach((name) => {
+      const matches = state.employees.filter((e) => (e.name || '').trim() === name);
+      if (matches.length) {
+        state.employees = state.employees.filter((e) => (e.name || '').trim() !== name);
+        matches.forEach((m) => state.removedEmployees.push({ code: m.code || '', name: m.name || '' }));
+        changed = true;
+      }
+      if (!state.removedEmployees.some((r) => (r.name || '').trim() === name)) {
+        state.removedEmployees.push({ code: '', name });
+        changed = true;
+      }
+    });
+    DEFAULT_DEPARTMENTS.forEach((name) => {
+      if (!state.employees.some((e) => (e.name || '').trim() === name)) {
+        state.employees.push({ id: uid(), code: '', name, active: true, addedAt: Date.now() });
+        changed = true;
+      }
+    });
+    if (changed) saveState();
+  }
+
+  function fillDeptSelect() {
+    deptOptions = state.employees.filter((e) => e.active !== false && (e.name || e.code));
+    recvDept.innerHTML = '';
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'בחר מחלקה…';
+    recvDept.append(placeholder);
+    deptOptions.forEach((d, i) => {
+      const opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = d.name || `קוד ${d.code}`;
+      recvDept.append(opt);
+    });
+    if (deptOptions.length === 0) {
+      placeholder.textContent = 'אין מחלקות במערכת – הוסף בצד המנהל';
+    }
+  }
+
+  function selectedDept() {
+    const i = recvDept.value;
+    if (i === '') return null;
+    const d = deptOptions[Number(i)];
+    return d ? { code: d.code || '', name: d.name || '' } : null;
+  }
+
+  function showIssueError(text) {
+    issueError.textContent = text;
+    issueError.classList.remove('hidden');
+  }
+
+  function hideIssueError() {
+    issueError.classList.add('hidden');
+  }
+
+  // Resolves the typed/scanned serial according to the current mode and
+  // refreshes the model / source-department rows on screen.
+  function resolveSerial() {
+    const serial = issueSerial.value.trim();
+    hideIssueError();
+    if (scanMode === 'return') {
+      return { ok: true, serial: issueMed.name, model: issueMed.model || 'מסופון' };
+    }
+    if (!serial) {
+      signModel.textContent = '—';
+      if (scanMode === 'transfer') signFromDept.textContent = '—';
+      return { ok: false, serial: '' };
+    }
+    if (scanMode === 'transfer') {
+      const source = state.meds.find((m) => m.name === serial);
+      if (!source) {
+        signModel.textContent = '—';
+        signFromDept.textContent = '—';
+        return { ok: false, serial, error: 'המסופון אינו רשום כנמצא בשטח – לא ניתן להעביר' };
+      }
+      signModel.textContent = source.model || 'מסופון';
+      signFromDept.textContent = departmentLabel(source.employee);
+      return { ok: true, serial, model: source.model || 'מסופון', source };
+    }
+    // take
+    const alreadyOut = state.meds.find((m) => m.name === serial);
+    if (alreadyOut) {
+      signModel.textContent = alreadyOut.model || 'מסופון';
+      return {
+        ok: false, serial,
+        error: `המסופון כבר בשטח אצל מחלקת ${departmentLabel(alreadyOut.employee)} – יש להשתמש בהעברה`,
+      };
+    }
+    const model = modelFromInventory(serial) || 'מסופון';
+    signModel.textContent = model;
+    return { ok: true, serial, model };
+  }
+
+  function openIssueScreen(mode, med) {
+    scanMode = (mode === 'return' || mode === 'transfer') ? mode : 'take';
+    issueMed = scanMode === 'return' ? med : null;
     const isReturn = scanMode === 'return';
-    signTitle.textContent = isReturn ? 'חתימה על החזרת מסופון' : 'חתימה על לקיחת מסופון';
+    const isTransfer = scanMode === 'transfer';
+
+    signTitle.textContent = isReturn ? 'החזרת מסופון' : isTransfer ? 'קבלת מסופון בהעברה' : 'ניפוק מסופון';
     signInstruction.textContent = isReturn
       ? 'אני מאשר/ת בחתימתי כי החזרתי את המסופון ומרגע זה הוא אינו באחריותי.'
-      : 'אני מאשר/ת בחתימתי כי קיבלתי את המסופון לידיי ואני אחראי/ת עליו עד להחזרתו.';
-    scanConfirmBtn.textContent = isReturn ? 'אישור החזרה' : 'אישור לקיחה';
-    signSerial.textContent = scannedTerminal.serial;
-    signModel.textContent = scannedTerminal.model;
-    scanModal.classList.add('hidden');
-    signScreen.classList.remove('hidden');
-    // The canvas gets its real size only after the screen is visible
+      : isTransfer
+        ? 'אני מאשר/ת בחתימתי את קבלת המסופון בהעברה ממחלקה אחרת, ומרגע זה הוא באחריותי עד להחזרתו.'
+        : 'אני מאשר/ת בחתימתי כי קיבלתי את המסופון לידיי ואני אחראי/ת עליו עד להחזרתו.';
+    scanConfirmBtn.textContent = isReturn ? 'אישור החזרה' : isTransfer ? 'אישור העברה' : 'שחרור';
+    signBackBtn.textContent = (isReturn || isTransfer) ? 'ביטול' : 'ניקוי';
+
+    // Automatic details, straight from the clock and the login session
+    signIssuer.textContent = ISSUING_STATION;
+    const tick = () => { signDateTime.textContent = formatDateTime(Date.now()); };
+    tick();
+    clearInterval(issueClockTimer);
+    issueClockTimer = setInterval(tick, 30 * 1000);
+
+    signFromDeptRow.classList.toggle('hidden', !isTransfer);
+    signFromDept.textContent = '—';
+    // On a return the terminal goes back to the returns department
+    signToDeptRow.classList.toggle('hidden', !isReturn);
+    issueSerial.value = isReturn ? med.name : '';
+    issueSerial.readOnly = isReturn;
+    signModel.textContent = isReturn ? (med.model || 'מסופון') : '—';
+    receiverFields.classList.toggle('hidden', isReturn);
+    fillDeptSelect();
+    recvDept.value = '';
+    recvName.value = '';
+    recvEmpNo.value = '';
+    hideIssueError();
+
+    // The inline form is always on screen; bring it into view for return/transfer
+    if (isReturn || isTransfer) {
+      signScreen.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
     requestAnimationFrame(() => {
       resizeSignaturePad();
       clearSignature();
+      // Keep the RF field ready for typing or a barcode-gun scan
+      if (!isReturn) issueSerial.focus({ preventScroll: !isTransfer });
     });
   }
 
-  function closeSignScreen(cancelAll) {
-    signScreen.classList.add('hidden');
-    if (cancelAll) {
-      scannedTerminal = null;
-      returningMed = null;
+  // Release is allowed only with a terminal, a signature, a receiving
+  // department and receiver details (take/transfer)
+  function updateConfirmState() {
+    const needsReceiver = scanMode !== 'return';
+    const receiverOk = !needsReceiver || (recvName.value.trim().length > 0 && selectedDept() !== null);
+    const serialOk = issueSerial.value.trim().length > 0;
+    scanConfirmBtn.disabled = !(hasSignature && receiverOk && serialOk);
+  }
+  recvName.addEventListener('input', updateConfirmState);
+  recvEmpNo.addEventListener('input', updateConfirmState);
+  recvDept.addEventListener('change', updateConfirmState);
+  issueSerial.addEventListener('input', () => {
+    resolveSerial();
+    updateConfirmState();
+  });
+
+  // RF guns type the code and send Enter – resolve and jump to the receiver name
+  issueSerial.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const resolved = resolveSerial();
+    updateConfirmState();
+    if (!resolved.ok) {
+      if (resolved.error) showIssueError(resolved.error);
+      return;
     }
+    if (scanMode !== 'return') recvName.focus();
+  });
+
+  // The form never disappears – it resets back to a fresh issue (take) form
+  function closeSignScreen() {
+    openIssueScreen('take');
   }
 
-  continueSignBtn.addEventListener('click', openSignScreen);
-
-  signBackBtn.addEventListener('click', () => {
-    // Back to the scan result (terminal details are still there)
-    closeSignScreen(false);
-    scanModal.classList.remove('hidden');
-    scanView.classList.add('hidden');
-    scanResult.classList.remove('hidden');
-  });
+  signBackBtn.addEventListener('click', closeSignScreen);
 
   // ---------- Employee signature pad ----------
   const signaturePad = $('#signaturePad');
@@ -603,7 +745,7 @@
     sigCtx.clearRect(0, 0, signaturePad.width, signaturePad.height);
     sigCtx.restore();
     hasSignature = false;
-    scanConfirmBtn.disabled = true;
+    updateConfirmState();
   }
 
   function sigPos(e) {
@@ -621,7 +763,7 @@
     sigCtx.lineTo(p.x + 0.1, p.y + 0.1);
     sigCtx.stroke();
     hasSignature = true;
-    scanConfirmBtn.disabled = false;
+    updateConfirmState();
   });
 
   signaturePad.addEventListener('pointermove', (e) => {
@@ -637,71 +779,6 @@
 
   clearSignatureBtn.addEventListener('click', clearSignature);
 
-  async function startScan() {
-    scannedTerminal = null;
-    scanResult.classList.add('hidden');
-    scanView.classList.remove('hidden');
-    stopScanning();
-
-    // Try to open the device camera (back camera on phones)
-    let cameraOn = false;
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      try {
-        scanStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
-        scanVideo.srcObject = scanStream;
-        cameraOn = true;
-      } catch {}
-    }
-
-    scanVideo.classList.toggle('hidden', !cameraOn);
-    scanFallback.classList.toggle('hidden', cameraOn);
-
-    const baseHint = scanMode === 'return'
-      ? 'סרוק את הברקוד שעל המסופון שברצונך להחזיר'
-      : 'כוון את המצלמה אל הברקוד שעל גב המסופון';
-
-    if (cameraOn && 'BarcodeDetector' in window) {
-      // Real barcode scanning from the live camera feed
-      scanHint.textContent = baseHint;
-      const detector = new BarcodeDetector();
-      detectTimer = setInterval(async () => {
-        if (!scanStream || scanVideo.readyState < 2) return;
-        try {
-          const codes = await detector.detect(scanVideo);
-          if (codes.length && codes[0].rawValue) scanFound(codes[0].rawValue);
-        } catch {}
-      }, 350);
-    } else if (cameraOn) {
-      // Camera works but the browser can't decode barcodes – simulate a hit (demo)
-      scanHint.textContent = baseHint;
-      scanTimer = setTimeout(() => scanFound(null), 3000);
-    } else {
-      // No camera available – fully simulated scan (demo)
-      scanHint.textContent = 'לא נמצאה מצלמה – מדמה סריקה...';
-      scanTimer = setTimeout(() => scanFound(null), 2400);
-    }
-  }
-
-  function openScanModal(mode, med) {
-    scanMode = mode === 'return' ? 'return' : 'take';
-    returningMed = scanMode === 'return' ? med : null;
-    scanTitle.textContent = scanMode === 'return' ? 'החזרת מסופון' : 'לקיחת מסופון';
-    scanModal.classList.remove('hidden');
-    startScan();
-  }
-
-  function closeScanModal() {
-    stopScanning();
-    scanModal.classList.add('hidden');
-    scannedTerminal = null;
-    returningMed = null;
-  }
-
-  scanAgainBtn.addEventListener('click', startScan);
-
   function currentEmployee() {
     try {
       const s = JSON.parse(localStorage.getItem('tms.session.v1'));
@@ -710,55 +787,110 @@
     return { code: '', name: '' };
   }
 
+  function empKeyOf(emp) {
+    if (!emp) return '|';
+    return `${emp.code || ''}|${emp.name || ''}`;
+  }
+
+  function departmentLabel(emp) {
+    if (!emp || (!emp.name && !emp.code)) return 'מחלקה לא מזוהה';
+    return emp.name || `קוד ${emp.code}`;
+  }
+
+  // "שחרור" — the single confirmation button of the issue screen
   scanConfirmBtn.addEventListener('click', () => {
-    if (!scannedTerminal || !hasSignature) return;
+    if (!hasSignature) return;
+    const resolved = resolveSerial();
+    if (!resolved.ok) {
+      showIssueError(resolved.error || 'יש לסרוק או להקליד מספר מסופון');
+      return;
+    }
     let signature = null;
     try { signature = signaturePad.toDataURL('image/png'); } catch {}
-    const employee = currentEmployee();
+    // The station (returns department) is logged in – it is the issuer, automatically.
+    // The terminal itself is registered to the receiving department chosen in the form.
+    const issuer = { ...currentEmployee(), name: ISSUING_STATION };
+    const employee = scanMode === 'return' ? (issueMed ? issueMed.employee : issuer) : selectedDept();
+    if (scanMode !== 'return' && !employee) {
+      showIssueError('יש לבחור מחלקה מקבלת');
+      return;
+    }
+    if (scanMode === 'transfer' && resolved.source &&
+        empKeyOf(resolved.source.employee) === empKeyOf(employee)) {
+      showIssueError('המסופון כבר נמצא במחלקה שנבחרה – אין צורך בהעברה');
+      return;
+    }
+    const receiver = scanMode === 'return' ? null : {
+      name: recvName.value.trim(),
+      empNo: recvEmpNo.value.trim(),
+    };
+    const now = Date.now();
 
-    if (scanMode === 'return' && returningMed) {
-      const medId = returningMed.id;
+    if (scanMode === 'return' && issueMed) {
+      const medId = issueMed.id;
       state.meds = state.meds.filter((m) => m.id !== medId);
       state.history.push({
         id: uid(),
-        name: scannedTerminal.serial,
+        name: resolved.serial,
         action: 'הוחזר',
         employee,
+        issuer,
+        receiver: issueMed.receiver || null,
         signature,
-        takenAt: Date.now(),
+        takenAt: now,
+      });
+    } else if (scanMode === 'transfer' && resolved.source) {
+      const fromEmployee = resolved.source.employee;
+      const med = state.meds.find((m) => m.id === resolved.source.id);
+      if (med) {
+        med.employee = employee;
+        med.receiver = receiver;
+        med.signature = signature;
+        med.transferredAt = now;
+        med.transferredFrom = fromEmployee;
+      }
+      state.history.push({
+        id: uid(),
+        name: resolved.serial,
+        action: 'הועבר',
+        employee,
+        fromEmployee,
+        issuer,
+        receiver,
+        signature,
+        takenAt: now,
       });
     } else {
       state.meds.push({
         id: uid(),
-        name: scannedTerminal.serial,
-        model: scannedTerminal.model,
+        name: resolved.serial,
+        model: resolved.model,
         employee,
+        issuer,
+        receiver,
         signature,
         times: [],
         days: [],
-        createdAt: Date.now(),
+        createdAt: now,
       });
       state.history.push({
         id: uid(),
-        name: scannedTerminal.serial,
+        name: resolved.serial,
         action: 'נלקח',
         employee,
+        issuer,
+        receiver,
         signature,
-        takenAt: Date.now(),
+        takenAt: now,
       });
     }
 
     saveState();
     render();
-    closeSignScreen(true);
-    closeScanModal();
+    closeSignScreen();
   });
 
-  scanModal.addEventListener('click', (e) => {
-    if (e.target === scanModal) closeScanModal();
-  });
-
-  addBtn.addEventListener('click', () => openScanModal('take'));
+  $('#transferBtn').addEventListener('click', () => openIssueScreen('transfer'));
   addTimeBtn.addEventListener('click', () => addTimeRow(''));
   cancelBtn.addEventListener('click', closeModal);
 
@@ -1377,11 +1509,8 @@
       case 'reminderModal':
         closeReminderModal();
         break;
-      case 'scanModal':
-        closeScanModal();
-        break;
       case 'signScreen':
-        closeSignScreen(true);
+        closeSignScreen();
         break;
       case 'confirmModal':
         pendingConfirm = null;
@@ -1396,7 +1525,9 @@
   });
 
   // ---------- Init ----------
+  ensureDefaultDepartments();
   render();
+  openIssueScreen('take'); // the issue form is the department's main screen
   checkReminders();
   setInterval(checkReminders, CHECK_INTERVAL_MS);
 })();

@@ -73,8 +73,28 @@
           <span>סה"כ במלאי</span>
         </div>
       </div>
+      <div class="terminal-search">
+        <input type="search" id="terminalSearch" placeholder="חיפוש מסופון — מספר סידורי, מחלקה או מקבל" />
+      </div>
+
+      <div class="table-wrap rep-table-wrap">
+        <table class="data-table" id="allTerminalsTable">
+          <thead>
+            <tr>
+              <th>מסופון</th>
+              <th>מחלקה</th>
+              <th>תנועה אחרונה</th>
+              <th>סטטוס</th>
+            </tr>
+          </thead>
+          <tbody id="allTerminalsTbody"></tbody>
+        </table>
+      </div>
+      <p id="emptyAllTerminals" class="empty hidden">לא נמצאו מסופונים.</p>
+
+      <h3 class="report-title">מסופונים בשטח — פירוט וחתימות</h3>
       <ul id="terminalsList" class="meds-list"></ul>
-      <p id="emptyTerminals" class="empty hidden">אין מסופונים בשטח כרגע. כשעובד ייקח מסופון הוא יופיע כאן.</p>
+      <p id="emptyTerminals" class="empty hidden">אין מסופונים בשטח כרגע. כשמחלקה תיקח מסופון הוא יופיע כאן.</p>
     </section>
 
     <section id="tab-history" class="tab-panel">
@@ -118,12 +138,12 @@
         </div>
         <div class="stat-card">
           <strong id="repActiveEmp">0</strong>
-          <span>עובדים פעילים</span>
+          <span>מחלקות פעילות</span>
         </div>
       </div>
 
       <div class="report-emp-header">
-        <h3 class="report-title">פעילות לפי עובד</h3>
+        <h3 class="report-title">פעילות לפי מחלקה</h3>
         <div id="repViewToggle" class="report-view-toggle hidden" role="radiogroup" aria-label="אופן תצוגה">
           <button type="button" class="report-view-btn" data-view="chart">גרף</button>
           <button type="button" class="report-view-btn" data-view="list">רשימה</button>
@@ -141,8 +161,9 @@
               <th>תאריך ושעה</th>
               <th>פעולה</th>
               <th>מסופון</th>
-              <th>שם עובד</th>
               <th>מחלקה</th>
+              <th>מקבל</th>
+              <th>מנפק</th>
             </tr>
           </thead>
           <tbody id="repHistoryTbody"></tbody>
@@ -165,15 +186,14 @@
           <line x1="12" y1="18" x2="12" y2="12"/>
           <polyline points="9 15 12 18 15 15"/>
         </svg>
-        ייבוא עובדים מאקסל
+        ייבוא מחלקות מאקסל
       </button>
       <input type="file" id="importEmpFileInput" accept=".xlsx,.xls,.csv,.txt" class="hidden" />
-      <p class="hint import-hint">קובץ Excel (xlsx) או CSV — עמודה ראשונה: שם העובד, עמודה שנייה: קוד עובד, עמודה שלישית: מחלקה.</p>
+      <p class="hint import-hint">קובץ Excel (xlsx) או CSV — עמודה ראשונה: שם המחלקה, עמודה שנייה: קוד מחלקה.</p>
 
       <form id="addEmployeeForm" class="emp-add-form">
-        <input type="text" id="newEmpName" placeholder="שם העובד" maxlength="40" />
-        <input type="text" id="newEmpCode" placeholder="קוד עובד" inputmode="numeric" maxlength="20" />
-        <input type="text" id="newEmpDept" placeholder="מחלקה" maxlength="40" />
+        <input type="text" id="newEmpName" placeholder="שם המחלקה" maxlength="40" />
+        <input type="text" id="newEmpCode" placeholder="קוד מחלקה" inputmode="numeric" maxlength="20" />
         <button type="submit" class="primary-btn emp-add-btn">הוסף</button>
       </form>
       <p id="empStatus" class="import-status hidden"></p>
@@ -182,9 +202,8 @@
         <table class="data-table" id="employeesTable">
           <thead>
             <tr>
-              <th>שם העובד</th>
-              <th>קוד עובד</th>
-              <th>מחלקה</th>
+              <th>שם המחלקה</th>
+              <th>קוד מחלקה</th>
               <th>מסופונים</th>
               <th>סטטוס</th>
               <th aria-label="פעולות"></th>
@@ -193,7 +212,7 @@
           <tbody id="employeesTbody"></tbody>
         </table>
       </div>
-      <p id="emptyEmployees" class="empty hidden">אין עובדים ברשימה. ייבא קובץ אקסל, הוסף עובד ידנית, או שעובדים יתווספו אוטומטית עם הפעילות הראשונה שלהם.</p>
+      <p id="emptyEmployees" class="empty hidden">אין מחלקות ברשימה. ייבא קובץ אקסל, הוסף מחלקה ידנית, או שמחלקות יתווספו אוטומטית עם הפעילות הראשונה שלהן.</p>
     </section>
   </main>
 
@@ -242,7 +261,7 @@
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
-      <span class="nav-label">עובדים</span>
+      <span class="nav-label">מחלקות</span>
     </button>
   </nav>
 
@@ -253,7 +272,7 @@
       <h2 id="sigViewTitle">חתימה</h2>
       <p id="sigViewMeta" class="hint"></p>
       <div class="sig-view-frame">
-        <img id="sigViewImage" alt="חתימת העובד" />
+        <img id="sigViewImage" alt="חתימה" />
         <p id="sigViewEmpty" class="empty hidden">לא נשמרה חתימה לפעולה זו.</p>
       </div>
       <div class="modal-actions">

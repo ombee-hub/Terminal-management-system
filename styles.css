@@ -723,6 +723,24 @@ main {
 
 .emp-chart-val.zero { color: var(--text-muted); }
 
+/* Terminal search on the admin main screen */
+.terminal-search { margin-bottom: 12px; }
+
+.terminal-search input {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.terminal-search input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
 /* Take/return detail table in the reports tab */
 .rep-table-wrap {
   max-height: 420px;
@@ -740,6 +758,112 @@ main {
 .action-label { font-weight: 600; }
 .action-label.action-taken { color: #b98600; }
 .action-label.action-returned { color: #2e6fb0; }
+.action-label.action-transferred { color: #6d28d9; }
+
+/* Manual serial entry next to the RF scan */
+.manual-entry {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.manual-entry input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.manual-entry input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
+.manual-entry .secondary-btn { flex: 0 0 auto; }
+
+/* Receiver details on the signature screen */
+.sign-field {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: right;
+}
+
+.sign-field input,
+.sign-field select {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 400;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.sign-field input:focus,
+.sign-field select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* RF field on the issue screen — an "RF" tag beside the input box, like the whiteboard */
+.rf-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.rf-tag {
+  display: flex;
+  align-items: center;
+  background: var(--primary);
+  color: white;
+  font-weight: 800;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  border-radius: 10px;
+  padding: 0 16px;
+}
+
+.rf-row input {
+  flex: 1;
+  min-width: 0;
+  margin-top: 0 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.issue-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: var(--danger);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+  margin: 10px 0;
+}
+
+/* Transfer button and section title on the employee dashboard */
+.transfer-cta {
+  display: block;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.list-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 4px 0 10px;
+}
 
 /* ---------- Splash screen (every page load) ---------- */
 .splash {
@@ -1789,6 +1913,45 @@ input.switch:checked::after { transform: translateX(-20px); }
   flex-direction: column;
 }
 
+/* Inline variant: the issue form sits inside the page as a card (the whiteboard screen) */
+.sign-screen.inline {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  background: transparent;
+  margin-bottom: 16px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.sign-screen.inline .sign-header {
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 13px 16px;
+}
+
+.sign-screen.inline .sign-header h2 { font-size: 1.05rem; }
+
+.sign-screen.inline .sign-body {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  max-width: none;
+  overflow: visible;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.sign-screen.inline .sign-pad-area {
+  flex: none;
+  min-height: 0;
+}
+
+.sign-screen.inline #signaturePad {
+  height: 140px;
+  flex: none;
+}
+
 .sign-header {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
@@ -1851,7 +2014,16 @@ input.switch:checked::after { transform: translateX(-20px); }
   gap: 10px;
 }
 
-.sign-actions .ghost-btn { flex: 0 0 auto; min-width: 96px; }
+.sign-actions .ghost-btn,
+.sign-actions .danger-btn { flex: 0 0 auto; min-width: 96px; }
+
+/* The release button stays clearly brand-yellow even while disabled */
+.sign-actions .primary-btn:disabled {
+  opacity: 1;
+  background: #ffd94d;
+  color: rgba(43, 57, 68, 0.55);
+}
+
 .sign-actions .primary-btn { flex: 1; margin-bottom: 0; }
 
 /* Employee signature pad */

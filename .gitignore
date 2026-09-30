@@ -20,3 +20,7 @@ node_modules/
 # Local data / secrets
 *.env
 .env.*
+
+# Internal working materials – not part of the public site
+Service_Request_System_Claude_Code.md
+20260930_124910.jpg

@@ -117,24 +117,14 @@
     });
   }
 
-  function employeeDepartment(emp) {
-    if (!emp) return '';
-    if (emp.department) return emp.department;
-    const rec = emp.code && employeeByCode.get(emp.code);
-    return (rec && rec.department) || '';
-  }
-
   function employeeName(emp) {
-    if (!emp || (!emp.name && !emp.code)) return 'עובד לא מזוהה';
+    if (!emp || (!emp.name && !emp.code)) return 'מחלקה לא מזוהה';
     const rec = emp.code && employeeByCode.get(emp.code);
-    return emp.name || (rec && rec.name) || 'עובד לא מזוהה';
+    return emp.name || (rec && rec.name) || 'מחלקה לא מזוהה';
   }
 
   function employeeLabel(emp) {
-    const name = employeeName(emp);
-    if (name === 'עובד לא מזוהה') return name;
-    const dept = employeeDepartment(emp);
-    return dept ? `${name} · ${dept}` : name;
+    return employeeName(emp);
   }
 
   function openSignatureView(title, meta, signature) {
@@ -160,6 +150,7 @@
     const state = loadState();
     syncEmployeesFromActivity(state);
     refreshEmployeeNames(state);
+    renderAllTerminals(state);
     renderStats(state);
     renderTerminals(state);
     renderHistory(state);
@@ -177,7 +168,6 @@
   const addEmployeeForm = $('#addEmployeeForm');
   const newEmpName = $('#newEmpName');
   const newEmpCode = $('#newEmpCode');
-  const newEmpDept = $('#newEmpDept');
   const empStatus = $('#empStatus');
 
   // Employees who took/returned terminals are added to the list automatically,
@@ -238,21 +228,20 @@
     e.preventDefault();
     const name = newEmpName.value.trim();
     const code = newEmpCode.value.trim();
-    const department = newEmpDept.value.trim();
     if (!name && !code) {
-      showEmpStatus('יש להזין שם או קוד עובד', true);
+      showEmpStatus('יש להזין שם או קוד מחלקה', true);
       return;
     }
     const data = loadState();
     if (code && data.employees.some((emp) => emp.code === code)) {
-      showEmpStatus(`קוד עובד ${code} כבר קיים ברשימה`, true);
+      showEmpStatus(`קוד מחלקה ${code} כבר קיים ברשימה`, true);
       return;
     }
     clearRemovalMark(data, code, name);
-    data.employees.push({ id: uid(), code, name, department, active: true, addedAt: Date.now() });
+    data.employees.push({ id: uid(), code, name, active: true, addedAt: Date.now() });
     saveState(data);
     addEmployeeForm.reset();
-    showEmpStatus(`העובד ${name || code} נוסף לרשימה`, false);
+    showEmpStatus(`המחלקה ${name || code} נוספה לרשימה`, false);
     render();
   });
 
@@ -283,10 +272,6 @@
       codeTd.className = 'cell-num';
       codeTd.textContent = emp.code || '—';
 
-      const deptTd = document.createElement('td');
-      deptTd.className = 'cell-name';
-      deptTd.textContent = emp.department || '—';
-
       const holdsTd = document.createElement('td');
       holdsTd.className = 'cell-num';
       holdsTd.textContent = holdingByEmp.get(`${emp.code || ''}|${emp.name || ''}`) || 0;
@@ -298,7 +283,7 @@
       toggle.type = 'checkbox';
       toggle.className = 'switch';
       toggle.checked = emp.active !== false;
-      toggle.setAttribute('aria-label', `עובד ${emp.active === false ? 'לא פעיל' : 'פעיל'}`);
+      toggle.setAttribute('aria-label', `מחלקה ${emp.active === false ? 'לא פעילה' : 'פעילה'}`);
       toggle.addEventListener('change', () => {
         const data = loadState();
         const rec = data.employees.find((x) => x.id === emp.id);
@@ -319,11 +304,11 @@
       delTd.className = 'cell-actions';
       const del = document.createElement('button');
       del.className = 'history-delete';
-      del.setAttribute('aria-label', 'הסר עובד');
+      del.setAttribute('aria-label', 'הסר מחלקה');
       del.innerHTML = buildTrashIconSVG();
       del.addEventListener('click', () => {
         const label = emp.name || `קוד ${emp.code}`;
-        confirmAction(`להסיר את ${label} מרשימת העובדים?`, () => {
+        confirmAction(`להסיר את ${label} מרשימת המחלקות?`, () => {
           const data = loadState();
           data.employees = data.employees.filter((x) => x.id !== emp.id);
           data.removedEmployees.push({ code: emp.code || '', name: emp.name || '' });
@@ -333,7 +318,7 @@
       });
       delTd.append(del);
 
-      tr.append(nameTd, codeTd, deptTd, holdsTd, statusTd, delTd);
+      tr.append(nameTd, codeTd, holdsTd, statusTd, delTd);
       employeesTbody.append(tr);
     });
   }
@@ -353,7 +338,6 @@
     rows.forEach((row, idx) => {
       const name = (row[0] || '').toString().trim();
       const code = (row[1] || '').toString().trim();
-      const department = (row[2] || '').toString().trim();
       if (!name && !code) return;
       if (idx === 0 && isEmpHeaderRow(row)) return;
       if ((code && existingCodes.has(code)) || existingNames.has(`${code}|${name}`)) {
@@ -363,7 +347,7 @@
       if (code) existingCodes.add(code);
       existingNames.add(`${code}|${name}`);
       clearRemovalMark(data, code, name);
-      data.employees.push({ id: uid(), code, name, department, active: true, addedAt: Date.now() });
+      data.employees.push({ id: uid(), code, name, active: true, addedAt: Date.now() });
       added++;
     });
     saveState(data);
@@ -380,8 +364,8 @@
     try {
       const rows = await parseImportFile(file);
       const { added, skipped } = importEmployeeRows(rows);
-      let msg = added > 0 ? `נוספו ${added} עובדים לרשימה` : 'לא נוספו עובדים חדשים';
-      if (skipped > 0) msg += ` · ${skipped} דולגו (עובד שכבר קיים)`;
+      let msg = added > 0 ? `נוספו ${added} מחלקות לרשימה` : 'לא נוספו מחלקות חדשות';
+      if (skipped > 0) msg += ` · ${skipped} דולגו (מחלקה שכבר קיימת)`;
       showEmpStatus(msg, added === 0);
       render();
     } catch (err) {
@@ -513,7 +497,8 @@
 
       const actionTd = document.createElement('td');
       const action = document.createElement('span');
-      action.className = 'action-label ' + (h.action === 'נלקח' ? 'action-taken' : 'action-returned');
+      const actionClass = { 'נלקח': 'action-taken', 'הוחזר': 'action-returned', 'הועבר': 'action-transferred' }[h.action] || '';
+      action.className = 'action-label ' + actionClass;
       action.textContent = h.action || '—';
       actionTd.append(action);
 
@@ -523,13 +508,21 @@
 
       const nameTd = document.createElement('td');
       nameTd.className = 'cell-name';
-      nameTd.textContent = employeeName(h.employee);
+      nameTd.textContent = h.action === 'הועבר' && h.fromEmployee
+        ? `${employeeName(h.fromEmployee)} ← ${employeeName(h.employee)}`
+        : employeeName(h.employee);
 
-      const deptTd = document.createElement('td');
-      deptTd.className = 'cell-name';
-      deptTd.textContent = employeeDepartment(h.employee) || '—';
+      const recvTd = document.createElement('td');
+      recvTd.className = 'cell-name';
+      recvTd.textContent = h.receiver && h.receiver.name
+        ? `${h.receiver.name}${h.receiver.empNo ? ` (${h.receiver.empNo})` : ''}`
+        : '—';
 
-      tr.append(timeTd, actionTd, serialTd, nameTd, deptTd);
+      const issuerTd = document.createElement('td');
+      issuerTd.className = 'cell-name';
+      issuerTd.textContent = h.issuer ? employeeName(h.issuer) : '—';
+
+      tr.append(timeTd, actionTd, serialTd, nameTd, recvTd, issuerTd);
       repHistoryTbody.append(tr);
     });
 
@@ -612,16 +605,19 @@
   const EXPORT_NAME = 'דו״ח מסופונים שבועי';
 
   function buildExportRows(state) {
-    const header = ['תאריך ושעה', 'פעולה', 'מספר סידורי', 'שם עובד', 'קוד עובד', 'מחלקה'];
+    const header = ['תאריך ושעה', 'פעולה', 'מספר סידורי', 'מחלקה', 'קוד מחלקה', 'שם מקבל', 'מס\' עובד מקבל', 'מנפק', 'הועבר ממחלקה'];
     const rows = [...state.history]
       .sort((a, b) => b.takenAt - a.takenAt)
       .map((h) => [
         formatDateTime(h.takenAt),
         h.action || '',
         h.name || '',
-        (h.employee && h.employee.name) || '',
+        employeeName(h.employee),
         (h.employee && h.employee.code) || '',
-        employeeDepartment(h.employee),
+        (h.receiver && h.receiver.name) || '',
+        (h.receiver && h.receiver.empNo) || '',
+        h.issuer ? employeeName(h.issuer) : '',
+        h.fromEmployee ? employeeName(h.fromEmployee) : '',
       ]);
     return [header, ...rows];
   }
@@ -633,7 +629,7 @@
     try {
       await loadSheetJS();
       const ws = window.XLSX.utils.aoa_to_sheet(rows);
-      ws['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 16 }];
+      ws['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 12 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
       const wb = window.XLSX.utils.book_new();
       wb.Workbook = { Views: [{ RTL: true }] };
       window.XLSX.utils.book_append_sheet(wb, ws, 'דוח מסופונים');
@@ -695,6 +691,17 @@
       model.textContent = item.model || 'דגם לא ידוע';
 
       info.append(name, model);
+
+      // Last movement of this terminal, from the movements log
+      const lastMove = state.history
+        .filter((h) => h.name === item.serial)
+        .sort((a, b) => b.takenAt - a.takenAt)[0];
+      const move = document.createElement('span');
+      move.className = 'history-time';
+      move.textContent = lastMove
+        ? `תנועה אחרונה: ${lastMove.action} ${formatDateTime(lastMove.takenAt)}`
+        : 'אין תנועות';
+      info.append(move);
       left.append(icon, info);
 
       const isOut = outSerials.has(item.serial);
@@ -802,6 +809,78 @@
     }
   });
 
+  // ---------- Main table: every terminal, its department, last movement, status ----------
+  const allTerminalsTbody = $('#allTerminalsTbody');
+  const allTerminalsWrap = $('#allTerminalsTbody') && $('#allTerminalsTbody').closest('.table-wrap');
+  const emptyAllTerminals = $('#emptyAllTerminals');
+  const terminalSearch = $('#terminalSearch');
+
+  terminalSearch.addEventListener('input', () => renderAllTerminals(loadState()));
+
+  function renderAllTerminals(state) {
+    // Every serial the system knows: warehouse inventory, terminals out
+    // in the field, and terminals that only appear in the movements log.
+    const serials = new Map(); // serial -> model
+    state.inventory.forEach((t) => serials.set(t.serial, t.model || ''));
+    state.meds.forEach((m) => { if (!serials.has(m.name)) serials.set(m.name, m.model || ''); });
+    state.history.forEach((h) => { if (h.name && !serials.has(h.name)) serials.set(h.name, ''); });
+
+    const outBySerial = new Map(state.meds.map((m) => [m.name, m]));
+    const lastMoveBySerial = new Map();
+    state.history.forEach((h) => {
+      const prev = lastMoveBySerial.get(h.name);
+      if (!prev || h.takenAt > prev.takenAt) lastMoveBySerial.set(h.name, h);
+    });
+
+    const q = terminalSearch.value.trim().toLowerCase();
+    const rows = [...serials.entries()]
+      .map(([serial, model]) => {
+        const med = outBySerial.get(serial) || null;
+        const lastMove = lastMoveBySerial.get(serial) || null;
+        return { serial, model, med, lastMove };
+      })
+      .filter((r) => {
+        if (!q) return true;
+        const dept = r.med ? employeeLabel(r.med.employee) : '';
+        const recv = (r.med && r.med.receiver && r.med.receiver.name) || '';
+        return `${r.serial} ${r.model} ${dept} ${recv}`.toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        if (!!b.med !== !!a.med) return b.med ? 1 : -1; // out in the field first
+        return a.serial.localeCompare(b.serial, 'he');
+      });
+
+    allTerminalsTbody.innerHTML = '';
+    allTerminalsWrap.classList.toggle('hidden', rows.length === 0);
+    emptyAllTerminals.classList.toggle('hidden', rows.length > 0);
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+
+      const serialTd = document.createElement('td');
+      serialTd.className = 'cell-num';
+      serialTd.textContent = r.serial + (r.model ? ` · ${r.model}` : '');
+
+      const deptTd = document.createElement('td');
+      deptTd.className = 'cell-name';
+      deptTd.textContent = r.med ? employeeLabel(r.med.employee) : '—';
+
+      const moveTd = document.createElement('td');
+      moveTd.className = 'cell-num';
+      moveTd.textContent = r.lastMove
+        ? `${r.lastMove.action} · ${formatDateTime(r.lastMove.takenAt)}`
+        : '—';
+
+      const statusTd = document.createElement('td');
+      const chip = document.createElement('span');
+      chip.className = 'status-chip' + (r.med ? ' out' : '');
+      chip.textContent = r.med ? 'בשטח' : 'במחסן';
+      statusTd.append(chip);
+
+      tr.append(serialTd, deptTd, moveTd, statusTd);
+      allTerminalsTbody.append(tr);
+    });
+  }
+
   function renderTerminals(state) {
     terminalsList.innerHTML = '';
     if (state.meds.length === 0) {
@@ -835,13 +914,27 @@
 
       const sub = document.createElement('span');
       sub.className = 'terminal-sub';
-      sub.textContent = `${med.model || 'מסופון'} · נלקח ${formatDateTime(med.createdAt || Date.now())}`;
+      const lastMoveAt = med.transferredAt || med.createdAt || Date.now();
+      const lastMoveAction = med.transferredAt ? 'הועבר' : 'נלקח';
+      sub.textContent = `${med.model || 'מסופון'} · תנועה אחרונה: ${lastMoveAction} ${formatDateTime(lastMoveAt)}`;
 
       const emp = document.createElement('span');
       emp.className = 'terminal-sub terminal-emp';
       emp.textContent = employeeLabel(med.employee);
 
       info.append(name, sub, emp);
+      if (med.receiver && med.receiver.name) {
+        const recv = document.createElement('span');
+        recv.className = 'terminal-sub';
+        recv.textContent = `מקבל: ${med.receiver.name}${med.receiver.empNo ? ` (עובד ${med.receiver.empNo})` : ''}`;
+        info.append(recv);
+      }
+      if (med.transferredFrom) {
+        const from = document.createElement('span');
+        from.className = 'terminal-sub';
+        from.textContent = `הועבר ממחלקת ${employeeLabel(med.transferredFrom)}`;
+        info.append(from);
+      }
       headerLeft.append(icon, info);
 
       const status = document.createElement('span');
@@ -900,7 +993,12 @@
 
       const who = document.createElement('span');
       who.className = 'history-time';
-      who.textContent = employeeLabel(entry.employee);
+      who.textContent = entry.action === 'הועבר' && entry.fromEmployee
+        ? `ממחלקת ${employeeLabel(entry.fromEmployee)} אל ${employeeLabel(entry.employee)}`
+        : employeeLabel(entry.employee);
+      if (entry.receiver && entry.receiver.name) {
+        who.textContent += ` · מקבל: ${entry.receiver.name}${entry.receiver.empNo ? ` (${entry.receiver.empNo})` : ''}`;
+      }
 
       const time = document.createElement('span');
       time.className = 'history-time';

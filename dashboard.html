@@ -58,20 +58,58 @@
 
   <main>
     <section id="tab-meds" class="tab-panel active">
-      <button id="addBtn" class="primary-btn scan-cta">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <rect x="2" y="5" width="2" height="14"/>
-          <rect x="5.5" y="5" width="1" height="14"/>
-          <rect x="8" y="5" width="2.5" height="14"/>
-          <rect x="12" y="5" width="1" height="14"/>
-          <rect x="14.5" y="5" width="2" height="14"/>
-          <rect x="18" y="5" width="1" height="14"/>
-          <rect x="20.5" y="5" width="1.5" height="14"/>
-        </svg>
-        לקיחת מסופון
-      </button>
+      <!-- Issue / return / transfer form — always on screen, like the whiteboard -->
+      <div id="signScreen" class="sign-screen inline">
+        <header class="sign-header">
+          <h2 id="signTitle">ניפוק מסופון</h2>
+        </header>
+        <div class="sign-body">
+          <div class="scan-details sign-details">
+            <div class="scan-detail-row"><span>תאריך ושעה</span><strong id="signDateTime"></strong></div>
+            <div class="scan-detail-row"><span>מנפק (אוטומטי)</span><strong id="signIssuer"></strong></div>
+            <div class="scan-detail-row hidden" id="signFromDeptRow"><span>מועבר ממחלקה</span><strong id="signFromDept"></strong></div>
+            <div class="scan-detail-row hidden" id="signToDeptRow"><span>מחלקה מקבלת</span><strong>מחלקת החזרות</strong></div>
+          </div>
+
+          <label class="sign-field">מסופון
+            <span class="rf-row">
+              <span class="rf-tag" aria-hidden="true">RF</span>
+              <input type="text" id="issueSerial" maxlength="30" autocomplete="off" placeholder="הקלד או סרוק מספר סידורי" />
+            </span>
+          </label>
+          <div class="scan-details sign-details">
+            <div class="scan-detail-row"><span>דגם</span><strong id="signModel">—</strong></div>
+          </div>
+
+          <div id="receiverFields">
+            <label class="sign-field">מחלקה מקבלת
+              <select id="recvDept"></select>
+            </label>
+            <label class="sign-field">שם מלא של המקבל
+              <input type="text" id="recvName" maxlength="40" autocomplete="off" placeholder="שם פרטי ומשפחה" />
+            </label>
+            <label class="sign-field">מס' עובד של המקבל
+              <input type="text" id="recvEmpNo" inputmode="numeric" maxlength="20" autocomplete="off" placeholder="מספר עובד" />
+            </label>
+          </div>
+
+          <p id="issueError" class="issue-error hidden"></p>
+          <p id="signInstruction" class="sign-instruction">אני מאשר/ת בחתימתי כי קיבלתי את המסופון לידיי ואני אחראי/ת עליו עד להחזרתו.</p>
+          <div class="signature-pad-wrap sign-pad-area">
+            <canvas id="signaturePad"></canvas>
+            <button type="button" id="clearSignatureBtn" class="signature-clear">נקה</button>
+          </div>
+          <div class="sign-actions">
+            <button type="button" id="signBackBtn" class="danger-btn">ניקוי</button>
+            <button type="button" id="scanConfirmBtn" class="primary-btn" disabled>שחרור</button>
+          </div>
+        </div>
+      </div>
+
+      <button id="transferBtn" class="secondary-btn transfer-cta" type="button">העברת מסופון בין מחלקות</button>
+      <h3 class="list-title">מסופונים פעילים בשטח</h3>
       <ul id="medsList" class="meds-list"></ul>
-      <p id="emptyMeds" class="empty hidden">אין מסופונים ברשותך. לחץ על "לקיחת מסופון" כדי לסרוק מסופון חדש.</p>
+      <p id="emptyMeds" class="empty hidden">אין מסופונים בשטח. ניפוק מסופון מתבצע בטופס שלמעלה.</p>
     </section>
 
     <section id="tab-history" class="tab-panel">
@@ -148,69 +186,7 @@
     </div>
   </div>
 
-  <!-- Terminal scan modal -->
-  <div id="scanModal" class="modal hidden">
-    <div class="modal-content scan-content">
-      <button type="button" class="modal-close" data-close="scanModal" aria-label="סגור">×</button>
-      <h2 id="scanTitle">לקיחת מסופון</h2>
 
-      <!-- Scanning view -->
-      <div id="scanView">
-        <div class="scan-viewfinder">
-          <video id="scanVideo" class="scan-video hidden" autoplay playsinline muted></video>
-          <span class="scan-corner tl"></span>
-          <span class="scan-corner tr"></span>
-          <span class="scan-corner bl"></span>
-          <span class="scan-corner br"></span>
-          <div id="scanFallback" class="scan-barcode" aria-hidden="true"></div>
-          <div class="scan-line"></div>
-        </div>
-        <p id="scanHint" class="scan-hint">כוון את המצלמה אל הברקוד שעל גב המסופון</p>
-      </div>
-
-      <!-- Scan result view -->
-      <div id="scanResult" class="hidden">
-        <div class="scan-success-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="8 12.5 11 15.5 16 9"/>
-          </svg>
-        </div>
-        <p class="scan-success-title">המסופון זוהה בהצלחה</p>
-        <div class="scan-details">
-          <div class="scan-detail-row"><span>מספר סידורי</span><strong id="scanSerial"></strong></div>
-          <div class="scan-detail-row"><span>דגם</span><strong id="scanModel"></strong></div>
-        </div>
-        <div class="modal-actions">
-          <button type="button" id="scanAgainBtn" class="ghost-btn">סריקה חוזרת</button>
-          <button type="button" id="continueSignBtn" class="primary-btn">המשך לחתימה</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Terminal signature screen -->
-  <div id="signScreen" class="sign-screen hidden">
-    <header class="sign-header">
-      <button type="button" class="modal-close sign-close" data-close="signScreen" aria-label="ביטול">×</button>
-      <h2 id="signTitle">חתימה על לקיחת מסופון</h2>
-    </header>
-    <div class="sign-body">
-      <div class="scan-details sign-details">
-        <div class="scan-detail-row"><span>מספר סידורי</span><strong id="signSerial"></strong></div>
-        <div class="scan-detail-row"><span>דגם</span><strong id="signModel"></strong></div>
-      </div>
-      <p id="signInstruction" class="sign-instruction">אני מאשר/ת בחתימתי כי קיבלתי את המסופון לידיי ואני אחראי/ת עליו עד להחזרתו.</p>
-      <div class="signature-pad-wrap sign-pad-area">
-        <canvas id="signaturePad"></canvas>
-        <button type="button" id="clearSignatureBtn" class="signature-clear">נקה</button>
-      </div>
-      <div class="sign-actions">
-        <button type="button" id="signBackBtn" class="ghost-btn">חזרה</button>
-        <button type="button" id="scanConfirmBtn" class="primary-btn" disabled>אישור לקיחה</button>
-      </div>
-    </div>
-  </div>
 
   <!-- Confirm dialog -->
   <div id="confirmModal" class="modal hidden">
